@@ -10,8 +10,14 @@
 #import <CoreBluetooth/CoreBluetooth.h>
 #import <MBProgressHUD/MBProgressHUD.h>
 
+
+
+// 蓝牙特征值
+static NSString * const kServiceUUID = @"0000ffe0-0000-1000-8000-00805f9b34fb";
+static NSString * const kReadCharacteristicUUID = @"0000ffe1-0000-1000-8000-00805f9b34fb";
+
 // 小米手环名称
-#define BAND_NAME       @"MI Band 2"
+#define BAND_NAME      @"曾凌坤的MacBook Air"//@"T1"// @"MI Band 5"
 
 #define SCREEN_WIDTH    [UIScreen mainScreen].bounds.size.width
 #define SCREEN_HEIGHT   [UIScreen mainScreen].bounds.size.height
@@ -229,9 +235,10 @@
 
 - (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)peripheral advertisementData:(NSDictionary<NSString *,id> *)advertisementData RSSI:(NSNumber *)RSSI
 {
+    NSLog(@"发现蓝牙新设备：%@", peripheral.name);
     if ([peripheral.name isEqualToString:BAND_NAME]) {
         
-        NSLog(@"发现蓝牙新设备：%@", peripheral.name);
+       
         peripheral.delegate = self;
         [self.peripherals addObject:peripheral];
         
@@ -239,6 +246,16 @@
         
         [self connectPeripheralClick];
     }
+//    else
+//    {
+//        NSLog(@"发现蓝牙新设备：%@", peripheral.name);
+//        peripheral.delegate = self;
+//        [self.peripherals addObject:peripheral];
+//
+//        [self.mgr stopScan];
+//
+//        [self connectPeripheralClick];
+//    }
 }
 
 - (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error
@@ -286,7 +303,7 @@
             NSMutableArray *characteristics = [NSMutableArray arrayWithCapacity:0];
             [self.dataSource setObject:characteristics forKey:service.UUID.UUIDString];
             
-            [peripheral discoverCharacteristics:nil forService:service];
+            [peripheral discoverCharacteristics:@[[CBUUID UUIDWithString:@"2A23"]] forService:service];
         } else {
 
             BOOL exist = NO;
@@ -305,10 +322,21 @@
                 NSMutableArray *characteristics = [NSMutableArray arrayWithCapacity:0];
                 [self.dataSource setObject:characteristics forKey:service.UUID.UUIDString];
                 
-                [peripheral discoverCharacteristics:nil forService:service];
+                [peripheral discoverCharacteristics:@[[CBUUID UUIDWithString:@"2A23"]] forService:service];
             }
         }
+        
+        if ([service.UUID isEqual:[CBUUID UUIDWithString:kServiceUUID]]) {
+            
+            // discoverCharacteristics: nil 这里与扫描service是相同的,若扫描所有的特征值,直接传入nil作为参数即可。
+            [peripheral discoverCharacteristics:@[[CBUUID UUIDWithString:kReadCharacteristicUUID]]
+                                             forService:service];
+        }
     }
+    
+    
+    
+    
     
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.tableView reloadData];
@@ -317,6 +345,8 @@
 
 - (void)peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error
 {
+    NSLog(@"%@",service.UUID.UUIDString);
+    
     for (CBCharacteristic *characteristic in service.characteristics) {
         
         for (NSString *serviceUUID in self.services) {
@@ -363,6 +393,23 @@
 - (void)peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error
 {
     NSLog(@"发现%@ - 特征：UUID: %@, desc: %@, props: %zd, value: %@", peripheral.name, characteristic.UUID.UUIDString, characteristic.description, characteristic.properties, [[NSString alloc] initWithData:characteristic.value encoding:NSUTF8StringEncoding]);
+    
+    
+    NSString *value = [NSString stringWithFormat:@"%@",characteristic.value];
+    NSMutableString *macString = [[NSMutableString alloc] init];
+    [macString appendString:[[value substringWithRange:NSMakeRange(16, 2)] uppercaseString]];
+    [macString appendString:@":"];
+    [macString appendString:[[value substringWithRange:NSMakeRange(14, 2)] uppercaseString]];
+    [macString appendString:@":"];
+    [macString appendString:[[value substringWithRange:NSMakeRange(12, 2)] uppercaseString]];
+    [macString appendString:@":"];
+    [macString appendString:[[value substringWithRange:NSMakeRange(5, 2)] uppercaseString]];
+    [macString appendString:@":"];
+    [macString appendString:[[value substringWithRange:NSMakeRange(3, 2)] uppercaseString]];
+    [macString appendString:@":"];
+    [macString appendString:[[value substringWithRange:NSMakeRange(1, 2)] uppercaseString]];
+    NSLog(@"value==%@\nmac == %@",characteristic.value,macString);
+    
     
     for (NSString *srvUUID in self.services) {
         NSMutableArray *chrs = [self.dataSource objectForKey:srvUUID];
